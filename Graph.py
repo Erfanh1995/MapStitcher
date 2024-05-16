@@ -21,7 +21,9 @@ class Graph:
 		self.numberOfNodes = 0  # total number of nodes
 		self.numberOfEdges = 0  # total number of edges
 		self.largestEdgeID = 0  # largest edge id
+		#self.largestNodeID = 0  # largest node id
 		self.edgeLink = {} # node id -> [edge id 1, edge id 2, ...]
+		self.nodeHash = {} # (lon,lat) -> nid
 		self.edgeHash = {}  # (nid1, nid2) -> edge id
 		self.edgeWeight = {} # edge id -> weight of the edge
 		self.nodeWeight = {} # node id -> weight of the node
@@ -50,6 +52,7 @@ class Graph:
 		if [lon,lat] not in self.nodes.values():
 			if nid not in self.nodes.keys():
 				self.nodes[nid] = [lon, lat]
+				self.nodeHash[(lon,lat)] = nid
 				self.nodeLink[nid] = []
 				self.edgeLink[nid] = []
 				self.nodeWeight[nid] = nodeweight
@@ -60,6 +63,7 @@ class Graph:
 				self.numberOfNodes += 1
 				print(nid, "already exists. The new node ID is:", self.numberOfNodes)
 				self.nodes[self.numberOfNodes] = [lon, lat]
+				self.nodeHash[(lon,lat)] = self.numberOfNodes
 				self.nodeLink[self.numberOfNodes] = []
 				self.edgeLink[self.numberOfNodes] = []
 				self.nodeWeight[self.numberOfNodes] = nodeweight
@@ -155,10 +159,29 @@ class Graph:
 			self.numberOfEdges -= 1
 
 		self.deletedNodes[nodeid] = self.nodes[nodeid]
+		del self.nodeHash[self.nodes[nodeid]]
 		del self.nodes[nodeid]
 		del self.nodeWeight[nodeid]
 		del self.nodeLink[nodeid]
 		self.numberOfNodes -= 1
+	
+	def removeEdge(self, edgeid):
+		nid1 = self.edges[edgeid][0]
+		nid2 = self.edges[edgeid][1]
+		self.nodeDegree[nid1] -= 1
+		self.nodeDegree[nid2] -= 1
+		self.nodeLink[nid1].remove(nid2)
+		self.nodeLink[nid2].remove(nid1)
+		self.edgeLink[nid1].remove(edgeid)
+		self.edgeLink[nid2].remove(edgeid)
+		del self.edges[edgeid]
+		del self.edgeHash[tuple([nid1,nid2])]
+		del self.edgeHash[tuple([nid2,nid1])]
+		if edgeid in self.samples.keys():
+			for i in self.samples[edgeid]:
+				del self.sampleHash[i]
+			del self.samples[edgeid]
+		#self.numberOfEdges -= 1
 
 	def removeDuplicateEdges(self):
 		edges = {}

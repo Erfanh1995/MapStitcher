@@ -173,3 +173,7 @@ data/chicago/sophia/chicago_sophia_vertices.txt
 .DS_Store
 H_edges.txt
 H_vertices.txt
+data/berlin_large/berlin_large_osm_crp_tele_crp_edges.txt
+data/berlin_large/berlin_large_osm_crp_tele_crp_vertices.txt
+data/berlin_large/osm_crp/berlin_large_osm_crp_graph.pickle
+data/berlin_large/tele_crp/berlin_large_tele_crp_graph.pickle
