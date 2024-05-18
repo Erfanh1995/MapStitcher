@@ -51,7 +51,6 @@ def sum_tuple(tp1,tp2):
 def avg_tuple(tp1,tp2):
     return tuple([(tp1[0]+tp2[0])/2,(tp1[1]+tp2[1])/2])
 
-
 def check_sample_order(graph,edge,start):
     if length(vector(tuple(graph.nodes[start]),graph.samples[edge][0])) <= length(vector(tuple(graph.nodes[start]),graph.samples[edge][-1])):
         return True
@@ -60,10 +59,12 @@ def check_sample_order(graph,edge,start):
 
 def matched_percentage(graph,edge,g_matched):
     matched = 0
+    if len(graph.samples[edge]) == 0:
+        return 0
     for i in graph.samples[edge]:
         if g_matched[i] != 0:
             matched +=1
-    return (matched/len(graph.samples[edge]))*100
+    return matched/len(graph.samples[edge])
 
 def merge_like_a_dream(graph1,graph2,matching_threshold,bearing_limit,filename,start_time):
     if os.path.exists(filename+"_matching.pickle"):
@@ -238,16 +239,20 @@ def merge_like_a_dream(graph1,graph2,matching_threshold,bearing_limit,filename,s
     logging.info("-------------Starting the merge-------------")
     # Merging starts
     # Merge small portions missing
-    """
-    for i in g1_in_matched_to.keys():
-        if g1_in_matched_to[i] == 0 and graph1.degree[graph1.nodeHash[i]] == 1: # intersection on g1 not matched to g2 and is degree-1
-            edge = graph1.edgeLink[graph1.nodeHash[i]]
-            if g1_in_matched_to[graph1.samples[edge][-1]] != 0 and matched_percentage(graph1,edge,g1_matched_to) > 9.0:
-                if not check_sample_order(graph1,edge,i): # i is the end point and not the start point for the samples
-                    v = vector(g1_in_matched_to[graph1.samples[edge][-1]],graph1.samples[edge][-1])
+    """   
+    for intersection in g1_in_matched_to.keys():
+        if g1_in_matched_to[intersection] == 0 and graph1.degree[graph1.nodeHash[intersection]] == 1: # intersection on g1 not matched to g2 and is degree-1
+            edge = graph1.edgeLink[graph1.nodeHash[intersection]]
+            if matched_percentage(graph1,edge,g1_matched_to) > 0.9: 
+                if not check_sample_order(graph1,edge,intersection): # i is the end point and not the start point for the samples
+                    if g1_in_matched_to[graph1.samples[edge][-1]] != 0:
+                        v = vector(g1_in_matched_to[graph1.samples[edge][-1]],graph1.samples[edge][-1])
+                    
                 else:
-                    v = vector(g1_in_matched_to[graph1.samples[edge][0]],graph1.samples[edge][0])
-    """
+                    if g1_in_matched_to[graph1.samples[edge][0]] != 0:
+                        v = vector(g1_in_matched_to[graph1.samples[edge][0]],graph1.samples[edge][0])
+                    
+    """   
             
     # Merge big chunks from g2
     for intersection in g2_in_matched_to.keys():
@@ -261,15 +266,16 @@ def merge_like_a_dream(graph1,graph2,matching_threshold,bearing_limit,filename,s
                         #check that it has a similiar bearing. this is necessary for the average to be accurate
                         bearing_i = path_bearing_meters(graph2.nodes[graph2.edges[edge][0]][0], graph2.nodes[graph2.edges[edge][0]][1], graph2.nodes[graph2.edges[edge][1]][0], graph2.nodes[graph2.edges[edge][1]][1])
                         bearing_j = path_bearing_meters(graph2.nodes[graph2.edges[graph2.edgeHash[tuple([node,next_node])]][0]][0], graph2.nodes[graph2.edges[graph2.edgeHash[tuple([node,next_node])]][0]][1], graph2.nodes[graph2.edges[graph2.edgeHash[tuple([node,next_node])]][1]][0], graph2.nodes[graph2.edges[graph2.edgeHash[tuple([node,next_node])]][1]][1])
-                        if next_node != graph2.nodeHash[intersection] and bearing_difference(bearing_i,bearing_j) <= 10: # this is the one
+                        if next_node != graph2.nodeHash[intersection] and len(graph2.samples[graph2.edgeHash[tuple([node,next_node])]]) != 0 and bearing_difference(bearing_i,bearing_j) <= 10: # this is the one
                             edge = graph2.edgeHash[tuple([node,next_node])]
                             break
-                    if check_sample_order(graph2,edge,node):
-                        if g2_matched_to[graph2.samples[edge][0]] != 0:
-                            closest_samples.append(g2_matched_to[graph2.samples[edge][0]])
-                    else:
-                        if g2_matched_to[graph2.samples[edge][-1]] != 0:
-                            closest_samples.append(g2_matched_to[graph2.samples[edge][-1]])
+                    if graph2.samples[edge] != []:
+                        if check_sample_order(graph2,edge,node):
+                            if g2_matched_to[graph2.samples[edge][0]] != 0:
+                                closest_samples.append(g2_matched_to[graph2.samples[edge][0]])
+                        else:
+                            if g2_matched_to[graph2.samples[edge][-1]] != 0:
+                                closest_samples.append(g2_matched_to[graph2.samples[edge][-1]])
                     
                 elif g2_matched_perc[edge] >= 0.9:
                     if check_sample_order(graph2,edge,graph2.nodeHash[intersection]):
@@ -314,14 +320,6 @@ def merge_like_a_dream(graph1,graph2,matching_threshold,bearing_limit,filename,s
                 else: # they belong to different edges
                     # so there is a degree-2 node between them that can be matched to the intersection on g2
                     candidates = {}
-                    #edgeid = graph1.sampleHash[closest_samples[0]][0]
-                    #print(edgeid)
-                    #nodeids = graph1.edges[edgeid]
-                    #node1id = nodeids[0]
-                    #node2id = nodeids[1]
-                    #node1 = tuple(graph1.nodes[node1id])
-                    #node2 = tuple(graph1.nodes[node2id])
-                    #candidates[node1] = length(vector(node1,intersection))
                     candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][0]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][0]]),intersection))
                     candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][1]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][1]]),intersection))
                     candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[1]][0]][0]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[1]][0]][0]]),intersection))
@@ -332,8 +330,31 @@ def merge_like_a_dream(graph1,graph2,matching_threshold,bearing_limit,filename,s
                 
                 g2_in_matched_to[intersection] = new_node
                 g1_in_matched_to[new_node] = intersection
+            elif len(closest_samples) == 1: 
+                new_node = closest_samples[0]
+                id = graph1.addNode(1,*new_node)
+                # cut the edge in half
+                old_edge = graph1.sampleHash[closest_samples[0]][0]
+                node1 = graph1.edges[old_edge][0]
+                node2 = graph1.edges[old_edge][1]
+                edge1 = graph1.connectTwoNodes(1,node1,id)
+                edge2 = graph1.connectTwoNodes(1,node2,id)
+                # split the samples to two sets and assign them to their new edges
+                split_index_1 = graph1.samples[old_edge].index(closest_samples[0])
+                if check_sample_order(graph1,old_edge,node1):
+                    graph1.samples[edge1] = graph1.samples[old_edge][0:split_index_1+1]
+                    graph1.samples[edge2] = graph1.samples[old_edge][split_index_1:]
+                else: 
+                    graph1.samples[edge1] = graph1.samples[old_edge][split_index_1:]
+                    graph1.samples[edge2] = graph1.samples[old_edge][0:split_index_1+1]
+                for sam in graph1.samples[edge1]:
+                    graph1.sampleHash[sam] = edge1
+                for sam in graph1.samples[edge2]:
+                    graph1.sampleHash[sam] = edge2
+            else:
+                print(len(closest_samples))
 
-                    
+    for intersection in g2_in_matched_to.keys():                
         if g2_in_matched_to[intersection] != 0:   # An intersection from g2 is matched to an intersection from g1
             #if graph1.degree[graph1.nodehash[i]] < graph2.degree[graph2.nodehash[g1_in_matched_to[i]]]: # The vertex is missing edges so let's add them
                 # identify the edges that are not matched (the number might be more than the difference of vertex degrees)
@@ -364,28 +385,7 @@ def merge_like_a_dream(graph1,graph2,matching_threshold,bearing_limit,filename,s
             #elif graph1.degree[graph1.nodehash[i]] == graph2.degree[graph2.nodehash[g1_in_matched_to[i]]]: # check to see if they have the same degree, their edges should all be matched with each other. (NO NEW EDGES)
 
 
-        #else: # An intersection seems to be a road in the second map (possible degree-1 vertex)
-
-"""
-                else: # they belong to different edges
-                    # so there is a degree-2 node between them that can be matched to the intersection on g2
-                    candidates = {}
-                    #edgeid = graph1.sampleHash[closest_samples[0]][0]
-                    #print(edgeid)
-                    #nodeids = graph1.edges[edgeid]
-                    #node1id = nodeids[0]
-                    #node2id = nodeids[1]
-                    #node1 = tuple(graph1.nodes[node1id])
-                    #node2 = tuple(graph1.nodes[node2id])
-                    #candidates[node1] = length(vector(node1,intersection))
-                    candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][0]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][0]]),intersection))
-                    candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][1]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][1]]),intersection))
-                    candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[1]][0]][0]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[1]][0]][0]]),intersection))
-                    candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[1]][0]][1]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[1]][0]][1]]),intersection))
-                    new_node = min(candidates, key=candidates.get)
-                    if length(vector(candidates[new_node],intersection)) > matching_threshold:
-                        print("Warning!")
-"""                
+        #else: # An intersection seems to be a road in the second map (possible degree-1 vertex)     
              
 
 """
@@ -428,25 +428,26 @@ def stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matc
     queue.append(graph2.nodeHash[intersection]) # takes node id from graph2
     prev_q.append(graph1.nodeHash[g2_in_matched_to[intersection]]) # takes node id from graph1
     visited[intersection] = True
-    #v = vector(g2_in_matched_to[intersection],intersection)
+    v = vector(intersection,g2_in_matched_to[intersection])
     while queue:
         s = queue.pop()
-        prev = prev_q.pop()
-        v = vector(tuple(graph2.nodes[s]),tuple(graph1.nodes[prev]))
+        org_prev = prev_q.pop()
+        #v = vector(tuple(graph2.nodes[s]),tuple(graph1.nodes[prev]))
         for node in graph2.nodeLink[s]:
             stitches = 0
+            prev = org_prev
             edge = graph2.edgeHash[tuple([s,node])]
-            if visited[node] == False and len(graph2.samples[edge]) == 0:
+            if visited_edge[edge] == False and len(graph2.samples[edge]) == 0:
                 queue.append(node)
                 prev_q.append(prev)
                 visited[node] = True
                 visited_edge[edge] = True
                 continue
+            #visited_edge[edge] == False
+            if len(graph2.samples[edge]) != 0 and check_sample_order(graph2,edge,s) == False:
+                graph2.samples[edge].reverse()
 
-            if visited[node] == False and check_sample_order(graph2,edge,s) == False:
-                        graph2.samples[edge].reverse()
-
-            if tuple(graph2.nodes[node]) not in g2_in_matched_to.keys() and visited[node] == False: # The next node is not an intersection
+            if tuple(graph2.nodes[node]) not in g2_in_matched_to.keys() and visited_edge[edge] == False: # The next node is not an intersection
                 if g2_matched_perc[edge] < 0.1:
                     flag = False
                     for sample in graph2.samples[edge]:
@@ -474,7 +475,7 @@ def stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matc
                 visited[node] = True
                 visited_edge[edge] = True 
             
-            elif tuple(graph2.nodes[node]) in g2_in_matched_to.keys() and g2_in_matched_to[tuple(graph2.nodes[node])] == 0 and visited[node] == False: # The next node is an intersection but is not matched to an intersection in g1
+            elif tuple(graph2.nodes[node]) in g2_in_matched_to.keys() and g2_in_matched_to[tuple(graph2.nodes[node])] == 0 and visited_edge[edge] == False: # The next node is an intersection but is not matched to an intersection in g1
                 if g2_matched_perc[edge] < 0.1:
                     flag = False
                     for sample in graph2.samples[edge]:
@@ -509,11 +510,11 @@ def stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matc
                 visited[node] = True 
                 visited_edge[edge] = True 
 
-            elif tuple(graph2.nodes[node]) in g2_in_matched_to.keys() and g2_in_matched_to[tuple(graph2.nodes[node])] != 0 and visited[node] == False: #  The next node is an intersection and it is matched to an intersection in g1
+            elif tuple(graph2.nodes[node]) in g2_in_matched_to.keys() and g2_in_matched_to[tuple(graph2.nodes[node])] != 0 and visited_edge[edge] == False: #  The next node is an intersection and it is matched to an intersection in g1
                 # Do we do anything here?
                 if g2_matched_perc[edge] < 0.1:
                     flag = False
-                    for sample in graph2.samples[edge]:
+                    for sample in graph2.samples[edge]: #dont add the last one, we directly connect to the intersection?
                         if g2_matched_to[sample] == 0:
                             new_point = sum_tuple(sample,v)
                             id = graph1.addNode(1,*new_point)
@@ -534,17 +535,19 @@ def stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matc
                     
                     g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
                     # Add the intersection
-                    new_intersection = sum_tuple(tuple(graph2.nodes[node]),v)
-                    id = graph1.addNode(1,*new_intersection)
+                    #new_intersection = sum_tuple(tuple(graph2.nodes[node]),v)
+                    #id = graph1.addNode(1,*new_intersection)
+                    id = graph1.nodeHash[g2_in_matched_to[tuple(graph2.nodes[node])]]
                     graph1.connectTwoNodes(1,prev,id)
-                    g2_in_matched_to[tuple(graph2.nodes[node])] = new_intersection
-                    g1_in_matched_to[new_intersection] = tuple(graph2.nodes[node])
+                    #g2_in_matched_to[tuple(graph2.nodes[node])] = new_intersection
+                    #g1_in_matched_to[new_intersection] = tuple(graph2.nodes[node])
                     # Here's where we prune the BFS tree and we dont add this node for further exploration
                 visited[node] = True
                 visited_edge[edge] = True
 
             # this might break the code
-            elif visited[node] == True and visited_edge[edge] == False:
+            # visited[node] == True and
+            elif visited_edge[edge] == False:
                 # We still need to stitch this edge but we do not add this node for further exploration
                 if g2_matched_perc[edge] < 0.1:
                     flag = False
