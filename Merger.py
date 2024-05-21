@@ -572,6 +572,11 @@ def stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matc
                     
                     g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
                 visited_edge[edge] = True
+            # we need to close the cycles    
+            elif visited_edge[edge] == True:
+                if len(graph2.samples[edge]) != 0:
+                    id = graph1.nodeHash[g2_matched_to[graph2.samples[edge][0]]]
+                    graph1.connectTwoNodes(1,prev,id)
 
 
 """
