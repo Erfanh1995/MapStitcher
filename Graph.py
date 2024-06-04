@@ -179,7 +179,11 @@ class Graph:
 		del self.edgeHash[tuple([nid2,nid1])]
 		if edgeid in self.samples.keys():
 			for i in self.samples[edgeid]:
-				del self.sampleHash[i]
+				if self.sampleHash[i] == [edgeid]:
+					del self.sampleHash[i]
+				else:
+					if edgeid in self.sampleHash[i]:
+						self.sampleHash[i].remove(edgeid)
 			del self.samples[edgeid]
 		#self.numberOfEdges -= 1
 
