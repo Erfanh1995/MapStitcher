@@ -35,6 +35,30 @@ def direction_difference(a_bearing, b_bearing):
     min_bearing = min(a_bearing, b_bearing)
     return min(abs(max_bearing - min_bearing), abs((360.0 - max_bearing) + min_bearing))
 
+def half_matched(graph,edge,start,matchedlist):
+    if check_sample_order(graph2,edge,start) == False:
+        graph2.samples[edge].reverse() 
+    flag = 0
+    prev = 2
+    check = 0
+    for sample in graph.samples[edge]:
+        if matchedlist[sample] == 0:
+            if prev == 2:
+                check = 1
+            if prev == 1:
+                flag +=1
+            prev = 0
+        else:
+            if prev == 0:
+                flag +=1
+            prev = 1
+    if prev == 1 and flag == 1 and check == 1:
+        return True
+    else:
+        return False
+
+
+
 def open_mkdir(filename, *args, **kwargs):
     """
     Open a file, creating directories if necessary. Wraps the default python 'open' function
@@ -987,118 +1011,93 @@ def stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matc
             stitches = 0
             prev = org_prev
             edge = graph2.edgeHash[tuple([s,node])]
-            if visited_edge[edge] == False and len(graph2.samples[edge]) == 0:
-                queue.append(node)
-                prev_q.append(prev)
-                visited[node] = True
-                visited_edge[edge] = True
-                continue
-            #visited_edge[edge] == False
-            if len(graph2.samples[edge]) != 0 and check_sample_order(graph2,edge,s) == False:
-                graph2.samples[edge].reverse()
-
             if tuple(graph2.nodes[node]) not in g2_in_matched_to.keys() and visited_edge[edge] == False: # The next node is not an intersection
-                if g2_matched_perc[edge] < 0.1:
-                    flag = False
-                    for sample in graph2.samples[edge]:
-                        if g2_matched_to[sample] == 0:
-                            new_point = sum_tuple(sample,v)
-                            id = graph1.addNode(1,*new_point)
-                            id_edge = graph1.connectTwoNodes(1,prev,id)
-                            graph1.samples[id_edge] = [new_point]
-                            graph1.sampleHash[new_point] = [id_edge]
-                            g2_matched_to[sample] = new_point
-                            g1_matched_to[new_point] = sample
-                            prev = id 
-                            stitches += 1
-                            flag = False
-                        else:
-                            # should we update v here? / does it become more accurate?
-                            if tuple(graph2.nodes[s]) == sample or tuple(graph1.nodes[prev]) == g2_matched_to[sample]:
-                                continue
-                            bearing_i = path_bearing_meters(*graph1.nodes[prev],*g2_matched_to[sample])
-                            bearing_j = path_bearing_meters(*graph2.nodes[s],*sample)
-                            if direction_difference(bearing_i,bearing_j) >= 90:
-                                continue
-                            v = vector(sample,g2_matched_to[sample])
-                            if flag == False:
-                                id = graph1.addNode(1,*g2_matched_to[sample])
-                                graph1.connectTwoNodes(1,prev,id)
-                                flag = True
-                                prev = id
-                    
-                    g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
+                if len(graph2.samples[edge]) == 0:
                     queue.append(node)
                     prev_q.append(prev)
-                    got_in = True
+
+                else:
+                    if check_sample_order(graph2,edge,s) == False:
+                        graph2.samples[edge].reverse()
                 
-                elif got_in: # we are not at the root so we are trying to connect to a degree-1 intersection in G1
-                    if g2_matched_perc[edge] == 1: # it's completely matched
-                        # we need to connect prev to the beginning of this edge that has degree-1
-                        # find the edge on g1
-                        the_g1_edge_id = graph1.sampleHash[g2_matched_to[graph2.samples[edge][0]]][0]
-                        #if graph1.nodeDegree[graph1.edges[the_g1_edge_id][0]] == 1: # this is the one
-                        if length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][0]])) < length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][1]])):
-                            graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][0])
-                            prev = graph1.edges[the_g1_edge_id][0]
+                    if g2_matched_perc[edge] < 0.1:
+                        flag = False
+                        for sample in graph2.samples[edge]:
+                            if g2_matched_to[sample] == 0:
+                                new_point = sum_tuple(sample,v)
+                                id = graph1.addNode(1,*new_point)
+                                id_edge = graph1.connectTwoNodes(1,prev,id)
+                                graph1.samples[id_edge] = [new_point]
+                                graph1.sampleHash[new_point] = [id_edge]
+                                g2_matched_to[sample] = new_point
+                                g1_matched_to[new_point] = sample
+                                prev = id 
+                                stitches += 1
+                                flag = False
+                            else:
+                                # should we update v here? / does it become more accurate?
+                                if tuple(graph2.nodes[s]) == sample or tuple(graph1.nodes[prev]) == g2_matched_to[sample]:
+                                    continue
+                                bearing_i = path_bearing_meters(*graph1.nodes[prev],*g2_matched_to[sample])
+                                bearing_j = path_bearing_meters(*graph2.nodes[s],*sample)
+                                if direction_difference(bearing_i,bearing_j) >= 90:
+                                    continue
+                                v = vector(sample,g2_matched_to[sample])
+                                if flag == False:
+                                    id = graph1.addNode(1,*g2_matched_to[sample])
+                                    graph1.connectTwoNodes(1,prev,id)
+                                    flag = True
+                                    prev = id
+                        
+                        g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
+                        queue.append(node)
+                        prev_q.append(prev)
+                        got_in = True
+                
+                    elif got_in: # we are not at the root so we are trying to connect to a degree-1 intersection in G1
+                        if g2_matched_perc[edge] == 1: # it's completely matched
+                            # we need to connect prev to the beginning of this edge that has degree-1
+                            # find the edge on g1
+                            the_g1_edge_id = graph1.sampleHash[g2_matched_to[graph2.samples[edge][0]]][0]
+                            #if graph1.nodeDegree[graph1.edges[the_g1_edge_id][0]] == 1: # this is the one
+                            if length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][0]])) < length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][1]])):
+                                graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][0])
+                                prev = graph1.edges[the_g1_edge_id][0]
 
-                        #elif graph1.nodeDegree[graph1.edges[the_g1_edge_id][1]] == 1:
-                        else:
-                            graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][1])
-                            prev = graph1.edges[the_g1_edge_id][1]
-
-                """
-                else: # this might be degree-1 intersection in g1
-                    # find the first sample on this edge that is matched
-                    for p in graph2.samples[edge]:
-                        if g2_matched_to[p] != 0:
-                            first_matched_sample = g2_matched_to[p]
-                            # see if the sample is matched to the last (or first) sample of the edge in g1 (nearest sample to the degree-1 intersection)
-                            the_edge = graph1.sampleHash[first_matched_sample][0]
-                            if graph1.samples[the_edge][0] == first_matched_sample and check_sample_order(graph1,the_edge,graph1.edges[the_edge][0]) and graph1.nodeDegree[graph1.edges[the_edge][0]] == 1:
-                                print("making an edge")
-                                graph1.connectTwoNodes(1,prev,graph1.edges[the_edge][0])
-
-                            elif graph1.samples[the_edge][0] == first_matched_sample and check_sample_order(graph1,the_edge,graph1.edges[the_edge][1]) and graph1.nodeDegree[graph1.edges[the_edge][1]] == 1:
-                                print("making an edge")
-                                graph1.connectTwoNodes(1,prev,graph1.edges[the_edge][1])
-                            break
-                """
+                            #elif graph1.nodeDegree[graph1.edges[the_g1_edge_id][1]] == 1:
+                            else:
+                                graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][1])
+                                prev = graph1.edges[the_g1_edge_id][1]
+                    """    
+                        elif half_matched(graph2,edge,s,g2_matched_to): # partially matched but the beginning has to be unmatched
+                            for sample in graph2.samples[edge]:
+                                if g2_matched_to[sample] != 0:
+                                    the_g1_edge_id = graph1.sampleHash[g2_matched_to[sample]][0]
+                                    if length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][0]])) < length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][1]])):
+                                        graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][0])
+                                        prev = graph1.edges[the_g1_edge_id][0]
+                                    else:
+                                        graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][1])
+                                        prev = graph1.edges[the_g1_edge_id][1]
+                                    break
+                                else:
+                                    new_point = sum_tuple(sample,v)
+                                    id = graph1.addNode(1,*new_point)
+                                    id_edge = graph1.connectTwoNodes(1,prev,id)
+                                    graph1.samples[id_edge] = [new_point]
+                                    graph1.sampleHash[new_point] = [id_edge]
+                                    g2_matched_to[sample] = new_point
+                                    g1_matched_to[new_point] = sample
+                                    prev = id 
+                                    stitches += 1
+                                
+                            g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
+                    """
                 visited[node] = True
                 visited_edge[edge] = True 
             
             elif tuple(graph2.nodes[node]) in g2_in_matched_to.keys() and g2_in_matched_to[tuple(graph2.nodes[node])] == 0 and visited_edge[edge] == False: # The next node is an intersection but is not matched to an intersection in g1
-                if g2_matched_perc[edge] < 0.1:
-                    flag = False
-                    for sample in graph2.samples[edge]:
-                        if g2_matched_to[sample] == 0:
-                            new_point = sum_tuple(sample,v)
-                            id = graph1.addNode(1,*new_point)
-                            id_edge = graph1.connectTwoNodes(1,prev,id)
-                            graph1.samples[id_edge] = [new_point]
-                            graph1.sampleHash[new_point] = [id_edge]
-                            g2_matched_to[sample] = new_point
-                            g1_matched_to[new_point] = sample
-                            prev = id 
-                            stitches += 1
-                            flag = False
-                        else:
-                            # should we update v here? / does it become more accurate? 
-                            if tuple(graph2.nodes[s]) == sample or tuple(graph1.nodes[prev]) == g2_matched_to[sample]:
-                                continue
-                            bearing_i = path_bearing_meters(*graph1.nodes[prev],*g2_matched_to[sample])
-                            bearing_j = path_bearing_meters(*graph2.nodes[s],*sample)
-                            if direction_difference(bearing_i,bearing_j) >= 90:
-                                continue
-                            v = vector(sample,g2_matched_to[sample])
-                            if flag == False:
-                                id = graph1.addNode(1,*g2_matched_to[sample])
-                                graph1.connectTwoNodes(1,prev,id) #this should only happen if the previous sample was not matched. if it was matched we shouldn't add a new edge
-                                flag = True
-                                prev = id
-                    
-                    g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
-                    # Add the intersection
+                if len(graph2.samples[edge]) == 0:
                     new_intersection = sum_tuple(tuple(graph2.nodes[node]),v)
                     id = graph1.addNode(1,*new_intersection)
                     graph1.connectTwoNodes(1,prev,id)
@@ -1108,109 +1107,196 @@ def stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matc
                     queue.append(node)
                     prev_q.append(prev)
                     got_in = True
+
+                else:
+                    if check_sample_order(graph2,edge,s) == False:
+                        graph2.samples[edge].reverse()
+                
+                    if g2_matched_perc[edge] < 0.1:
+                        flag = False
+                        for sample in graph2.samples[edge]:
+                            if g2_matched_to[sample] == 0:
+                                new_point = sum_tuple(sample,v)
+                                id = graph1.addNode(1,*new_point)
+                                id_edge = graph1.connectTwoNodes(1,prev,id)
+                                graph1.samples[id_edge] = [new_point]
+                                graph1.sampleHash[new_point] = [id_edge]
+                                g2_matched_to[sample] = new_point
+                                g1_matched_to[new_point] = sample
+                                prev = id 
+                                stitches += 1
+                                flag = False
+                            else:
+                                # should we update v here? / does it become more accurate? 
+                                if tuple(graph2.nodes[s]) == sample or tuple(graph1.nodes[prev]) == g2_matched_to[sample]:
+                                    continue
+                                bearing_i = path_bearing_meters(*graph1.nodes[prev],*g2_matched_to[sample])
+                                bearing_j = path_bearing_meters(*graph2.nodes[s],*sample)
+                                if direction_difference(bearing_i,bearing_j) >= 90:
+                                    continue
+                                v = vector(sample,g2_matched_to[sample])
+                                if flag == False:
+                                    id = graph1.addNode(1,*g2_matched_to[sample])
+                                    graph1.connectTwoNodes(1,prev,id) #this should only happen if the previous sample was not matched. if it was matched we shouldn't add a new edge
+                                    flag = True
+                                    prev = id
+                        
+                        g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
+                        # Add the intersection
+                        new_intersection = sum_tuple(tuple(graph2.nodes[node]),v)
+                        id = graph1.addNode(1,*new_intersection)
+                        graph1.connectTwoNodes(1,prev,id)
+                        g2_in_matched_to[tuple(graph2.nodes[node])] = new_intersection
+                        g1_in_matched_to[new_intersection] = graph2.nodes[node]
+                        prev = id 
+                        queue.append(node)
+                        prev_q.append(prev)
+                        got_in = True
                 visited[node] = True 
                 visited_edge[edge] = True 
 
             elif tuple(graph2.nodes[node]) in g2_in_matched_to.keys() and g2_in_matched_to[tuple(graph2.nodes[node])] != 0 and visited_edge[edge] == False: #  The next node is an intersection and it is matched to an intersection in g1
-                # Do we do anything here?
-                if g2_matched_perc[edge] < 0.1:
-                    flag = False
-                    for sample in graph2.samples[edge]: #dont add the last one, we directly connect to the intersection?
-                        if g2_matched_to[sample] == 0:
-                            new_point = sum_tuple(sample,v)
-                            bearing_i = path_bearing_meters(*new_point,*g2_in_matched_to[tuple(graph2.nodes[node])])
-                            bearing_j = path_bearing_meters(*graph2.nodes[s],*sample)
-                            if direction_difference(bearing_i,bearing_j) >= 90:
-                                break
-                            id = graph1.addNode(1,*new_point)
-                            id_edge = graph1.connectTwoNodes(1,prev,id)
-                            graph1.samples[id_edge] = [new_point]
-                            graph1.sampleHash[new_point] = [id_edge]
-                            g2_matched_to[sample] = new_point
-                            g1_matched_to[new_point] = sample
-                            prev = id 
-                            stitches += 1
-                            flag = False
-                        else:
-                            # should we update v here? / does it become more accurate?
-                            if tuple(graph2.nodes[s]) == sample or tuple(graph1.nodes[prev]) == g2_matched_to[sample]:
-                                continue
-                            bearing_i = path_bearing_meters(*graph1.nodes[prev],*g2_matched_to[sample])
-                            bearing_j = path_bearing_meters(*graph2.nodes[s],*sample)
-                            if direction_difference(bearing_i,bearing_j) >= 90:
-                                continue
-                            v = vector(sample,g2_matched_to[sample])
-                            if flag == False:
-                                id = graph1.addNode(1,*g2_matched_to[sample])
-                                graph1.connectTwoNodes(1,prev,id)
-                                flag = True
-                                prev = id
-                    
-                    g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
-                    # Add the intersection
+                if len(graph2.samples[edge]) == 0:
                     id = graph1.nodeHash[g2_in_matched_to[tuple(graph2.nodes[node])]]
                     graph1.connectTwoNodes(1,prev,id)
                     prev = id
-                    # Here's where we prune the BFS tree and we dont add this node for further exploration
 
-                elif got_in: # we are not at the root so we are trying to connect to a degree-1 intersection in G1
-                    if g2_matched_perc[edge] == 1: # it's completely matched
-                        # we need to connect prev to the beginning of this edge that has degree-1
-                        # find the edge on g1
-                        the_g1_edge_id = graph1.sampleHash[g2_matched_to[graph2.samples[edge][0]]][0]
-                        #if graph1.nodeDegree[graph1.edges[the_g1_edge_id][0]] == 1: # this is the one
-                        if length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][0]])) < length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][1]])):
-                            graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][0])
-                            prev = graph1.edges[the_g1_edge_id][0]
+                else:
+                    if check_sample_order(graph2,edge,s) == False:
+                        graph2.samples[edge].reverse()
 
-                        #elif graph1.nodeDegree[graph1.edges[the_g1_edge_id][1]] == 1:
-                        else:
-                            graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][1])
-                            prev = graph1.edges[the_g1_edge_id][1]
+                    if g2_matched_perc[edge] < 0.1:
+                        flag = False
+                        for sample in graph2.samples[edge]: #dont add the last one, we directly connect to the intersection?
+                            if g2_matched_to[sample] == 0:
+                                new_point = sum_tuple(sample,v)
+                                bearing_i = path_bearing_meters(*new_point,*g2_in_matched_to[tuple(graph2.nodes[node])])
+                                bearing_j = path_bearing_meters(*graph2.nodes[s],*sample)
+                                if direction_difference(bearing_i,bearing_j) >= 90:
+                                    break
+                                id = graph1.addNode(1,*new_point)
+                                id_edge = graph1.connectTwoNodes(1,prev,id)
+                                graph1.samples[id_edge] = [new_point]
+                                graph1.sampleHash[new_point] = [id_edge]
+                                g2_matched_to[sample] = new_point
+                                g1_matched_to[new_point] = sample
+                                prev = id 
+                                stitches += 1
+                                flag = False
+                            else:
+                                # should we update v here? / does it become more accurate?
+                                if tuple(graph2.nodes[s]) == sample or tuple(graph1.nodes[prev]) == g2_matched_to[sample]:
+                                    continue
+                                bearing_i = path_bearing_meters(*graph1.nodes[prev],*g2_matched_to[sample])
+                                bearing_j = path_bearing_meters(*graph2.nodes[s],*sample)
+                                if direction_difference(bearing_i,bearing_j) >= 90:
+                                    continue
+                                v = vector(sample,g2_matched_to[sample])
+                                if flag == False:
+                                    id = graph1.addNode(1,*g2_matched_to[sample])
+                                    graph1.connectTwoNodes(1,prev,id)
+                                    flag = True
+                                    prev = id
+                        
+                        g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
+                        # Add the intersection
+                        id = graph1.nodeHash[g2_in_matched_to[tuple(graph2.nodes[node])]]
+                        graph1.connectTwoNodes(1,prev,id)
+                        prev = id
+                        # Here's where we prune the BFS tree and we dont add this node for further exploration
 
+                    elif got_in: # we are not at the root so we are trying to connect to a degree-1 intersection in G1
+                        if g2_matched_perc[edge] == 1: # it's completely matched
+                            # we need to connect prev to the beginning of this edge that has degree-1
+                            # find the edge on g1
+                            the_g1_edge_id = graph1.sampleHash[g2_matched_to[graph2.samples[edge][0]]][0]
+                            #if graph1.nodeDegree[graph1.edges[the_g1_edge_id][0]] == 1: # this is the one
+                            if length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][0]])) < length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][1]])):
+                                graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][0])
+                                prev = graph1.edges[the_g1_edge_id][0]
+
+                            #elif graph1.nodeDegree[graph1.edges[the_g1_edge_id][1]] == 1:
+                            else:
+                                graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][1])
+                                prev = graph1.edges[the_g1_edge_id][1]
+                    """
+                        elif half_matched(graph2,edge,s,g2_matched_to): # partially matched but the beginning has to be unmatched and ending has to be matched
+                            for sample in graph2.samples[edge]:
+                                if g2_matched_to[sample] != 0:
+                                    the_g1_edge_id = graph1.sampleHash[g2_matched_to[sample]][0]
+                                    if length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][0]])) < length(vector(graph1.nodes[prev],graph1.nodes[graph1.edges[the_g1_edge_id][1]])):
+                                        graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][0])
+                                        prev = graph1.edges[the_g1_edge_id][0]
+                                    else:
+                                        graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][1])
+                                        prev = graph1.edges[the_g1_edge_id][1]
+                                    break
+                                else:
+                                    new_point = sum_tuple(sample,v)
+                                    id = graph1.addNode(1,*new_point)
+                                    id_edge = graph1.connectTwoNodes(1,prev,id)
+                                    graph1.samples[id_edge] = [new_point]
+                                    graph1.sampleHash[new_point] = [id_edge]
+                                    g2_matched_to[sample] = new_point
+                                    g1_matched_to[new_point] = sample
+                                    prev = id 
+                                    stitches += 1
+                                
+                            g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
+                    """
                 visited[node] = True
                 visited_edge[edge] = True
 
-            # this might break the code
-            # visited[node] == True and
-            elif visited_edge[edge] == False:
-                # We still need to stitch this edge but we do not add this node for further exploration
-                if g2_matched_perc[edge] < 0.1:
-                    flag = False
-                    for sample in graph2.samples[edge]:
-                        if g2_matched_to[sample] == 0:
-                            new_point = sum_tuple(sample,v)
-                            id = graph1.addNode(1,*new_point)
-                            id_edge = graph1.connectTwoNodes(1,prev,id)
-                            graph1.samples[id_edge] = [new_point]
-                            graph1.sampleHash[new_point] = [id_edge]
-                            g2_matched_to[sample] = new_point
-                            g1_matched_to[new_point] = sample
-                            prev = id 
-                            stitches += 1
-                            flag = False
-                        else:
-                            # should we update v here? / does it become more accurate?
-                            if tuple(graph2.nodes[s]) == sample or tuple(graph1.nodes[prev]) == g2_matched_to[sample]:
-                                continue
-                            bearing_i = path_bearing_meters(*graph1.nodes[prev],*g2_matched_to[sample])
-                            bearing_j = path_bearing_meters(*graph2.nodes[s],*sample)
-                            if direction_difference(bearing_i,bearing_j) >= 90:
-                                continue
-                            v = vector(sample,g2_matched_to[sample])
-                            if flag == False:
-                                id = graph1.addNode(1,*g2_matched_to[sample])
-                                graph1.connectTwoNodes(1,prev,id)
-                                flag = True
-                                prev = id
-                    
-                    g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
-                visited_edge[edge] = True
             # we need to close the cycles    
             elif visited_edge[edge] == True:
                 if len(graph2.samples[edge]) != 0:
+                    if check_sample_order(graph2,edge,s) == False:
+                        graph2.samples[edge].reverse()
                     id = graph1.nodeHash[g2_matched_to[graph2.samples[edge][0]]]
                     graph1.connectTwoNodes(1,prev,id)
+            """
+            elif visited_edge[edge] == False:
+                # We still need to stitch this edge but we do not add this node for further exploration
+                if len(graph2.samples[edge]) == 0:
+                    continue
+
+                else:
+                    if check_sample_order(graph2,edge,s) == False:
+                        graph2.samples[edge].reverse()
+                
+                    if g2_matched_perc[edge] < 0.1:
+                        flag = False
+                        for sample in graph2.samples[edge]:
+                            if g2_matched_to[sample] == 0:
+                                new_point = sum_tuple(sample,v)
+                                id = graph1.addNode(1,*new_point)
+                                id_edge = graph1.connectTwoNodes(1,prev,id)
+                                graph1.samples[id_edge] = [new_point]
+                                graph1.sampleHash[new_point] = [id_edge]
+                                g2_matched_to[sample] = new_point
+                                g1_matched_to[new_point] = sample
+                                prev = id 
+                                stitches += 1
+                                flag = False
+                            else:
+                                # should we update v here? / does it become more accurate?
+                                if tuple(graph2.nodes[s]) == sample or tuple(graph1.nodes[prev]) == g2_matched_to[sample]:
+                                    continue
+                                bearing_i = path_bearing_meters(*graph1.nodes[prev],*g2_matched_to[sample])
+                                bearing_j = path_bearing_meters(*graph2.nodes[s],*sample)
+                                if direction_difference(bearing_i,bearing_j) >= 90:
+                                    continue
+                                v = vector(sample,g2_matched_to[sample])
+                                if flag == False:
+                                    id = graph1.addNode(1,*g2_matched_to[sample])
+                                    graph1.connectTwoNodes(1,prev,id)
+                                    flag = True
+                                    prev = id
+                        
+                        g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
+                visited_edge[edge] = True
+            """
+            
 
 
 """
