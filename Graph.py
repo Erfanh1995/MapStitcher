@@ -21,7 +21,7 @@ class Graph:
 		self.numberOfNodes = 0  # total number of nodes
 		self.numberOfEdges = 0  # total number of edges
 		self.largestEdgeID = 0  # largest edge id
-		#self.largestNodeID = 0  # largest node id
+		self.largestNodeID = 0  # largest node id
 		self.edgeLink = {} # node id -> [edge id 1, edge id 2, ...]
 		self.nodeHash = {} # (lon,lat) -> nid
 		self.edgeHash = {}  # (nid1, nid2) -> edge id
@@ -58,17 +58,20 @@ class Graph:
 				self.nodeWeight[nid] = nodeweight
 				self.nodeDegree[nid] = 0
 				self.numberOfNodes += 1
+				if nid > self.largestNodeID:
+					self.largestNodeID = nid
 				return nid
 			else:
+				self.largestNodeID += 1
+				print(nid, "already exists. The new node ID is:", self.largestNodeID)
+				self.nodes[self.largestNodeID] = [lon, lat]
+				self.nodeHash[(lon,lat)] = self.largestNodeID
+				self.nodeLink[self.largestNodeID] = []
+				self.edgeLink[self.largestNodeID] = []
+				self.nodeWeight[self.largestNodeID] = nodeweight
+				self.nodeDegree[self.largestNodeID] = 0
 				self.numberOfNodes += 1
-				print(nid, "already exists. The new node ID is:", self.numberOfNodes)
-				self.nodes[self.numberOfNodes] = [lon, lat]
-				self.nodeHash[(lon,lat)] = self.numberOfNodes
-				self.nodeLink[self.numberOfNodes] = []
-				self.edgeLink[self.numberOfNodes] = []
-				self.nodeWeight[self.numberOfNodes] = nodeweight
-				self.nodeDegree[self.numberOfNodes] = 0
-				return self.numberOfNodes
+				return self.largestNodeID
 		else:
 			self.duplicateNodePointer[nid] = list(self.nodes.keys())[list(self.nodes.values()).index([lon,lat])]
 			#print("Duplicated Node:", list(self.nodes.keys())[list(self.nodes.values()).index([lon,lat])])
@@ -97,17 +100,18 @@ class Graph:
 			return list(self.edges.keys())[list(self.edges.values()).index([nid1,nid2])]
 
 		if eid in self.edges.keys():
-			self.numberOfEdges += 1
-			print(eid, "already exists. The new edge ID is:", self.numberOfEdges)
-			self.edges[self.numberOfEdges] = [nid1, nid2]
-			self.edgeLink[nid1].append(self.numberOfEdges)
+			self.largestEdgeID += 1
+			print(eid, "already exists. The new edge ID is:", self.largestEdgeID)
+			self.edges[self.largestEdgeID] = [nid1, nid2]
+			self.edgeLink[nid1].append(self.largestEdgeID)
 			self.nodeDegree[nid1] += 1
-			self.edgeLink[nid2].append(self.numberOfEdges)
+			self.edgeLink[nid2].append(self.largestEdgeID)
 			self.nodeDegree[nid2] += 1
-			self.edgeHash[(nid1, nid2)] = self.numberOfEdges
-			self.edgeHash[(nid2, nid1)] = self.numberOfEdges
-			self.edgeWeight[self.numberOfEdges] = edgeweight
-			return self.numberOfEdges
+			self.edgeHash[(nid1, nid2)] = self.largestEdgeID
+			self.edgeHash[(nid2, nid1)] = self.largestEdgeID
+			self.edgeWeight[self.largestEdgeID] = edgeweight
+			self.numberOfEdges += 1
+			return self.largestEdgeID
 
 		self.edges[eid] = [nid1, nid2]
 		self.edgeLink[nid1].append(eid)
@@ -170,10 +174,14 @@ class Graph:
 		nid2 = self.edges[edgeid][1]
 		self.nodeDegree[nid1] -= 1
 		self.nodeDegree[nid2] -= 1
-		self.nodeLink[nid1].remove(nid2)
-		self.nodeLink[nid2].remove(nid1)
-		self.edgeLink[nid1].remove(edgeid)
-		self.edgeLink[nid2].remove(edgeid)
+		if nid2 in self.nodeLink[nid1]:
+			self.nodeLink[nid1].remove(nid2)
+		if nid1 in self.nodeLink[nid2]:
+			self.nodeLink[nid2].remove(nid1)
+		if edgeid in self.edgeLink[nid1]:
+			self.edgeLink[nid1].remove(edgeid)
+		if edgeid in self.edgeLink[nid2]:
+			self.edgeLink[nid2].remove(edgeid)
 		del self.edges[edgeid]
 		del self.edgeHash[tuple([nid1,nid2])]
 		del self.edgeHash[tuple([nid2,nid1])]
@@ -185,7 +193,7 @@ class Graph:
 					if edgeid in self.sampleHash[i]:
 						self.sampleHash[i].remove(edgeid)
 			del self.samples[edgeid]
-		#self.numberOfEdges -= 1
+		self.numberOfEdges -= 1
 
 	def removeDuplicateEdges(self):
 		edges = {}

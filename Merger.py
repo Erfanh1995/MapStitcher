@@ -1068,7 +1068,7 @@ def stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matc
                             else:
                                 graph1.connectTwoNodes(1,prev,graph1.edges[the_g1_edge_id][1])
                                 prev = graph1.edges[the_g1_edge_id][1]
-                    """    
+                        
                         elif half_matched(graph2,edge,s,g2_matched_to): # partially matched but the beginning has to be unmatched
                             for sample in graph2.samples[edge]:
                                 if g2_matched_to[sample] != 0:
@@ -1092,7 +1092,7 @@ def stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matc
                                     stitches += 1
                                 
                             g2_matched_perc[edge] = (g2_matched_perc[edge]*len(graph2.samples[edge])+stitches)/len(graph2.samples[edge])
-                    """
+                    
                 visited[node] = True
                 visited_edge[edge] = True 
             
@@ -1252,8 +1252,11 @@ def stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matc
                 if len(graph2.samples[edge]) != 0:
                     if check_sample_order(graph2,edge,s) == False:
                         graph2.samples[edge].reverse()
-                    id = graph1.nodeHash[g2_matched_to[graph2.samples[edge][0]]]
-                    graph1.connectTwoNodes(1,prev,id)
+                    try:
+                        id = graph1.nodeHash[g2_matched_to[graph2.samples[edge][0]]]
+                        graph1.connectTwoNodes(1,prev,id)
+                    except:
+                        print("error")
             """
             elif visited_edge[edge] == False:
                 # We still need to stitch this edge but we do not add this node for further exploration
