@@ -177,3 +177,14 @@ data/berlin_large/berlin_large_osm_crp_tele_crp_edges.txt
 data/berlin_large/berlin_large_osm_crp_tele_crp_vertices.txt
 data/berlin_large/osm_crp/berlin_large_osm_crp_graph.pickle
 data/berlin_large/tele_crp/berlin_large_tele_crp_graph.pickle
+athens_large_osm
+athens_large_teleatlas
+berlin_large_osm
+berlin_large_tele
+data/berlin_large/berlin_large_osm_tele_edges.txt
+data/berlin_large/berlin_large_osm_tele_vertices.txt
+data/berlin_large/evals/berlin_large_osm_tele_wmm15.0_debug.log
+data/berlin_large/evals/berlin_large_osm_tele_wmm15.0_intersections.pickle
+data/berlin_large/evals/berlin_large_osm_tele_wmm15.0_intersections.txt
+data/berlin_large/evals/berlin_large_osm_tele_wmm15.0_matching.pickle
+data/berlin_large/evals/berlin_large_osm_tele_wmm15.0_matching.txt
