@@ -189,9 +189,8 @@ class Graph:
 			for i in self.samples[edgeid]:
 				if self.sampleHash[i] == [edgeid]:
 					del self.sampleHash[i]
-				else:
-					if edgeid in self.sampleHash[i]:
-						self.sampleHash[i].remove(edgeid)
+				elif edgeid in self.sampleHash[i]:
+					self.sampleHash[i].remove(edgeid)
 			del self.samples[edgeid]
 		self.numberOfEdges -= 1
 

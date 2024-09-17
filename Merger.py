@@ -8,6 +8,7 @@ import sys
 import networkx as nx
 import pickle
 import logging
+from rtree import Rtree
 
 interval = 5.0  # meters
 matching_threshold = 15.0  # meters
@@ -94,6 +95,355 @@ def matched_percentage(graph,edge,g_matched):
         if g_matched[i] != 0:
             matched +=1
     return matched/len(graph.samples[edge])
+
+def merge_faster(graph1,graph2,matching_threshold,bearing_limit,filename,start_time):
+    #if os.path.exists(filename+"_matching_greedy.pickle"):
+    #    with open_mkdir(filename+"_matching_greedy.pickle", 'rb') as handle:
+    #        matching = pickle.load(handle)
+    if True:
+        logging.info("-------------Starting the graph sampling-------------")
+        print("-------------Starting the graph sampling-------------")
+        #sample_index1 = Rtree()
+        sample_index2 = Rtree()
+        matched_samples = []
+        sample_list2 = list(graph2.sampleHash.keys())
+        #for sample in graph1.sampleHash.keys():
+        #    sample_index1.insert(sample)
+        for sampleid in range(len(sample_list2)):
+            sample_index2.insert(sampleid,sample_list2[sampleid])
+        for sample in graph1.sampleHash.keys():
+            closest_map2_sample_ids = sample_index2.nearest(sample,15)
+            for id in closest_map2_sample_ids:
+                found1 = False
+                sample_distance = length(vector(sample,sample_list2[id]))
+                if sample_distance <= matching_threshold and found1 == False:
+                    for i in graph1.sampleHash[sample]:
+                        for j in graph2.sampleHash[sample_list2[id]]:
+                            bearing_i = path_bearing_meters(graph1.nodes[graph1.edges[i][0]][0], graph1.nodes[graph1.edges[i][0]][1], graph1.nodes[graph1.edges[i][1]][0], graph1.nodes[graph1.edges[i][1]][1])
+                            bearing_j = path_bearing_meters(graph2.nodes[graph2.edges[j][0]][0], graph2.nodes[graph2.edges[j][0]][1], graph2.nodes[graph2.edges[j][1]][0], graph2.nodes[graph2.edges[j][1]][1])
+                            difference = bearing_difference(bearing_i,bearing_j)
+                            if difference < bearing_limit and found1 == False:
+                                matched_samples.append((sample,sample_list2[id],sample_distance))
+                                found1 = True
+                                break
+                        if found1 == True:
+                            break
+                    if found1 == True:
+                        break
+                else:
+                    break
+                if found1 == True:
+                    break
+                            
+        matched_samples.sort(key=lambda x: x[2])
+        g2_matched = graph2.samples.copy()
+        g2_matched_to = dict.fromkeys(graph2.sampleHash.keys(), 0)
+        g1_matched_to = dict.fromkeys(graph1.sampleHash.keys(), 0)
+        edge_matched_counter = dict.fromkeys(graph2.edges.keys(), 0)
+        with open_mkdir(filename+"_greedymatching.txt", 'w+') as eval_file:
+            while (len(matched_samples) > 0):
+                if g2_matched_to[matched_samples[0][1]] == 0:
+                    g2_matched_to[matched_samples[0][1]] = matched_samples[0][0]
+                    g1_matched_to[matched_samples[0][0]] = matched_samples[0][1]
+                    for e in graph2.sampleHash[matched_samples[0][1]]:
+                        g2_matched[e] = [1 if x==matched_samples[0][1] else x for x in g2_matched[e]]
+                        edge_matched_counter[e] += 1
+                    
+                    eval_file.write(str(matched_samples[0][2]) + "," + str(
+                    matched_samples[0][0][0]) + "," + str(
+                    matched_samples[0][0][1]) + "," + str(
+                    matched_samples[0][1][0]) + "," + str(
+                    matched_samples[0][1][1]) + "\n")
+
+                    matched_samples.pop(0)
+                
+                else:
+                    sample = matched_samples[0][0]
+                    candidate_matches = list(sample_index2.nearest(sample,15))
+                    for id in candidate_matches:
+                        found2 = False
+                        if g2_matched_to[sample_list2[id]] == 0: 
+                            sample_distance = length(vector(sample,sample_list2[id]))
+                            if sample_distance <= matching_threshold and found2 == False:
+                                for i in graph1.sampleHash[sample]:
+                                    for j in graph2.sampleHash[sample_list2[id]]:
+                                        bearing_i = path_bearing_meters(graph1.nodes[graph1.edges[i][0]][0], graph1.nodes[graph1.edges[i][0]][1], graph1.nodes[graph1.edges[i][1]][0], graph1.nodes[graph1.edges[i][1]][1])
+                                        bearing_j = path_bearing_meters(graph2.nodes[graph2.edges[j][0]][0], graph2.nodes[graph2.edges[j][0]][1], graph2.nodes[graph2.edges[j][1]][0], graph2.nodes[graph2.edges[j][1]][1])
+                                        difference = bearing_difference(bearing_i,bearing_j)
+                                        if difference < bearing_limit and found2 == False:
+                                            matched_samples[0] = (sample,sample_list2[id],sample_distance)
+                                            matched_samples.sort(key=lambda x: x[2])
+                                            found2 = True
+                                            break
+                                    if found2 == True:
+                                        break
+                                if found2 == True:
+                                    break
+                            # not sure about this else but ok
+                            else:
+                                break
+                            if found2 == True:
+                                break
+                        if found2 == True:
+                            break
+                    if found2 == False:
+                        matched_samples.pop(0)
+                    
+        
+            for key in g1_matched_to:
+                if g1_matched_to[key] == 0:
+                    eval_file.write("1000000" + "," + str(
+                        key[0]) + "," + str(
+                        key[1]) + "," + str(
+                        key[0]) + "," + str(
+                        key[1]) + "\n")
+            for key in g2_matched_to:
+                if g2_matched_to[key] == 0:
+                    eval_file.write("2000000" + "," + str(
+                        key[0]) + "," + str(
+                        key[1]) + "," + str(
+                        key[0]) + "," + str(
+                        key[1]) + "\n")
+
+            eval_file.flush()
+        
+        logging.info("Time for greedy matching of paths: " + str(time.time() - start_time))
+        print("Time for greedy matching of paths: " + str(time.time() - start_time))
+        
+        g2_matched_perc = dict.fromkeys(graph2.edges.keys(), 0)
+        for e in graph2.edges.keys():
+            if len(graph2.samples[e]) == 0:
+                g2_matched_perc[e] = 0
+            else:
+                g2_matched_perc[e] = edge_matched_counter[e]/len(graph2.samples[e])
+
+        # Matching intesections
+        start_time = time.time()
+        logging.info("-------------Starting the intesection matching-------------")
+        print("-------------Starting the intesecttion matching-------------")
+
+        graph1_intersections = graph1.findIntersections(bearing_limit)
+        graph2_intersections = graph2.findIntersections(bearing_limit)
+
+        intersection_index2 = Rtree()
+        matched_intersections = []
+
+        for intersectionkey in graph2_intersections.keys():
+            intersection_index2.insert(intersectionkey,graph2_intersections[intersectionkey])
+        for intersection in graph1_intersections.values():
+            closest_map2_intersection_ids = intersection_index2.nearest(intersection,10)
+            for id in closest_map2_intersection_ids:
+                found = False
+                sample_distance = length(vector(intersection,graph2_intersections[id]))
+                if sample_distance <= matching_threshold and found == False:
+                    matched_intersections.append((intersection,graph2_intersections[id],sample_distance))
+                    found = True
+                    break
+                else:
+                    break
+        
+        matched_intersections.sort(key=lambda x: x[2])
+        g2_in_matched_to = dict.fromkeys(graph2_intersections.values(), 0)
+        g1_in_matched_to = dict.fromkeys(graph1_intersections.values(), 0)
+        with open_mkdir(filename+"_greedyintersections.txt", 'w+') as eval_file:
+            while (len(matched_intersections) > 0):
+                if g2_in_matched_to[matched_intersections[0][1]] == 0:
+                    g2_in_matched_to[matched_intersections[0][1]] = matched_intersections[0][0]
+                    g1_in_matched_to[matched_intersections[0][0]] = matched_intersections[0][1]
+
+                    eval_file.write(str(matched_intersections[0][2]) + "," + str(
+                    matched_intersections[0][0][0]) + "," + str(
+                    matched_intersections[0][0][1]) + "," + str(
+                    matched_intersections[0][1][0]) + "," + str(
+                    matched_intersections[0][1][1]) + "\n")
+
+                    matched_intersections.pop(0)
+                
+                else:
+                    intersection = matched_intersections[0][0]
+                    candidate_matches = list(intersection_index2.nearest(intersection,10))
+                    for id in candidate_matches:
+                        found = False
+                        if g2_in_matched_to[graph2_intersections[id]] == 0: 
+                            sample_distance = length(vector(intersection,graph2_intersections[id]))
+                            if sample_distance <= matching_threshold and found == False:
+                                matched_intersections[0]=(intersection,graph2_intersections[id],sample_distance)
+                                matched_intersections.sort(key=lambda x: x[2])
+                                found = True
+                                break
+                            else:
+                                break
+                    if found == False:
+                        matched_intersections.pop(0)    
+                    
+            for key in g1_in_matched_to:
+                if g1_in_matched_to[key] == 0:
+                    eval_file.write("1000000" + "," + str(
+                        key[0]) + "," + str(
+                        key[1]) + "," + str(
+                        key[0]) + "," + str(
+                        key[1]) + "\n")
+            for key in g2_in_matched_to:
+                if g2_in_matched_to[key] == 0:
+                    eval_file.write("2000000" + "," + str(
+                        key[0]) + "," + str(
+                        key[1]) + "," + str(
+                        key[0]) + "," + str(
+                        key[1]) + "\n")
+
+            eval_file.flush()
+        
+        logging.info("Time for greedy matching of intersections: " + str(time.time() - start_time))
+        print("Time for greedy matching of intersections: " + str(time.time() - start_time))
+        start_time = time.time()
+        logging.info("-------------Starting the merge-------------")
+        # Merging starts
+
+        # Merge intersections from g2
+        for intersection in g2_in_matched_to.keys():
+            if g2_in_matched_to[intersection] == 0:
+                closest_samples = []
+                for node in graph2.nodeLink[graph2.nodeHash[intersection]]:
+                    edge = graph2.edgeHash[tuple([graph2.nodeHash[intersection],node])]
+                    if len(graph2.samples[edge]) == 0: # edge too short to have samples
+                        #find the next edge to get the nearest sample
+                        for next_node in graph2.nodeLink[node]:
+                            #check that it has a similiar bearing. this is necessary for the average to be accurate
+                            bearing_i = path_bearing_meters(graph2.nodes[graph2.edges[edge][0]][0], graph2.nodes[graph2.edges[edge][0]][1], graph2.nodes[graph2.edges[edge][1]][0], graph2.nodes[graph2.edges[edge][1]][1])
+                            bearing_j = path_bearing_meters(graph2.nodes[graph2.edges[graph2.edgeHash[tuple([node,next_node])]][0]][0], graph2.nodes[graph2.edges[graph2.edgeHash[tuple([node,next_node])]][0]][1], graph2.nodes[graph2.edges[graph2.edgeHash[tuple([node,next_node])]][1]][0], graph2.nodes[graph2.edges[graph2.edgeHash[tuple([node,next_node])]][1]][1])
+                            if next_node != graph2.nodeHash[intersection] and len(graph2.samples[graph2.edgeHash[tuple([node,next_node])]]) != 0 and bearing_difference(bearing_i,bearing_j) <= 10: # this is the one
+                                edge = graph2.edgeHash[tuple([node,next_node])]
+                                break
+                        if graph2.samples[edge] != []:
+                            if check_sample_order(graph2,edge,node):
+                                if g2_matched_to[graph2.samples[edge][0]] != 0:
+                                    closest_samples.append(g2_matched_to[graph2.samples[edge][0]])
+                            else:
+                                if g2_matched_to[graph2.samples[edge][-1]] != 0:
+                                    closest_samples.append(g2_matched_to[graph2.samples[edge][-1]])
+                        
+                    elif g2_matched_perc[edge] >= 0.9:
+                        if check_sample_order(graph2,edge,graph2.nodeHash[intersection]):
+                            if g2_matched_to[graph2.samples[edge][0]] != 0:
+                                closest_samples.append(g2_matched_to[graph2.samples[edge][0]])
+                        else:
+                            if g2_matched_to[graph2.samples[edge][-1]] != 0:
+                                closest_samples.append(g2_matched_to[graph2.samples[edge][-1]])
+                if len(closest_samples) == 2: # we are only looking for a new intersection on the road (like converting a degree-2 vertex to degree-3 or 4 but in this case the vertex does not exist. it just happens to be in the middle of an edge)
+                    if graph1.sampleHash[closest_samples[0]] == graph1.sampleHash[closest_samples[1]]: # they both belong to the same edge
+                        new_node = avg_tuple(closest_samples[0],closest_samples[1])
+                        id = graph1.addNode(1,*new_node)
+                        # cut the edge in half
+                        old_edge = graph1.sampleHash[closest_samples[0]][0]
+                        node1 = graph1.edges[old_edge][0]
+                        node2 = graph1.edges[old_edge][1]
+                        edge1 = graph1.connectTwoNodes(1,node1,id)
+                        edge2 = graph1.connectTwoNodes(1,node2,id)
+                        # split the samples to two sets and assign them to their new edges
+                        split_index_1 = graph1.samples[old_edge].index(closest_samples[0])
+                        split_index_2 = graph1.samples[old_edge].index(closest_samples[1])
+                        if abs(split_index_1-split_index_2) != 1: # there are samples in the middle that are matched to a different (possible parallel) road
+                            if split_index_1 < split_index_2:
+                                for i in range(split_index_1+1,split_index_2):
+                                    if length(vector(closest_samples[0],graph1.samples[old_edge][i])) < length(vector(closest_samples[1],graph1.samples[old_edge][i])):
+                                        split_index_1 += 1
+                                    else:
+                                        split_index_2 -= 1
+                            else:
+                                for i in range(split_index_2+1,split_index_1):
+                                    if length(vector(closest_samples[0],graph1.samples[old_edge][i])) < length(vector(closest_samples[1],graph1.samples[old_edge][i])):
+                                        split_index_1 -= 1
+                                    else:
+                                        split_index_2 += 1 
+                        #if abs(split_index_1-split_index_2) != 1:
+                        #    logging.info("difference: "+str(split_index_1-split_index_2))
+                        if split_index_1 < split_index_2: 
+                            if length(vector(closest_samples[0],tuple(graph1.nodes[node1]))) < length(vector(closest_samples[1],tuple(graph1.nodes[node1]))):
+                                graph1.samples[edge1] = graph1.samples[old_edge][0:split_index_1+1]
+                                graph1.samples[edge2] = graph1.samples[old_edge][split_index_2:]
+                            else: 
+                                graph1.samples[edge1] = graph1.samples[old_edge][split_index_2:]
+                                graph1.samples[edge2] = graph1.samples[old_edge][0:split_index_1+1]
+                        else:
+                            if length(vector(closest_samples[0],tuple(graph1.nodes[node1]))) < length(vector(closest_samples[1],tuple(graph1.nodes[node1]))):
+                                graph1.samples[edge1] = graph1.samples[old_edge][0:split_index_2+1]
+                                graph1.samples[edge2] = graph1.samples[old_edge][split_index_1:]
+                            else:
+                                graph1.samples[edge1] = graph1.samples[old_edge][split_index_1:]
+                                graph1.samples[edge2] = graph1.samples[old_edge][0:split_index_2+1]
+                        for sam in graph1.samples[edge1]:
+                            #graph1.sampleHash[sam].remove(old_edge)
+                            graph1.sampleHash[sam]= [edge1]
+                        for sam in graph1.samples[edge2]:
+                            #graph1.sampleHash[sam].remove(old_edge)
+                            graph1.sampleHash[sam] = [edge2]
+                        # remove the old edge
+                        graph1.removeEdge(old_edge) 
+                    else: # they belong to different edges
+                        # so there is a degree-2 node between them that can be matched to the intersection on g2
+                        candidates = {}
+                        candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][0]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][0]]),intersection))
+                        candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][1]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[0]][0]][1]]),intersection))
+                        candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[1]][0]][0]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[1]][0]][0]]),intersection))
+                        candidates[tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[1]][0]][1]])] = length(vector(tuple(graph1.nodes[graph1.edges[graph1.sampleHash[closest_samples[1]][0]][1]]),intersection))
+                        new_node = min(candidates, key=candidates.get)
+                        if length(vector(new_node,intersection)) > matching_threshold:
+                            print("Warning!")
+                    
+                    g2_in_matched_to[intersection] = new_node
+                    g1_in_matched_to[new_node] = intersection
+                elif len(closest_samples) == 1: 
+                    new_node = closest_samples[0]
+                    id = graph1.addNode(1,*new_node)
+                    # cut the edge in half
+                    old_edge = graph1.sampleHash[closest_samples[0]][0]
+                    node1 = graph1.edges[old_edge][0]
+                    node2 = graph1.edges[old_edge][1]
+                    edge1 = graph1.connectTwoNodes(1,node1,id)
+                    edge2 = graph1.connectTwoNodes(1,node2,id)
+                    # split the samples to two sets and assign them to their new edges
+                    split_index_1 = graph1.samples[old_edge].index(closest_samples[0])
+                    if check_sample_order(graph1,old_edge,node1):
+                        graph1.samples[edge1] = graph1.samples[old_edge][0:split_index_1+1]
+                        graph1.samples[edge2] = graph1.samples[old_edge][split_index_1:]
+                    else: 
+                        graph1.samples[edge1] = graph1.samples[old_edge][split_index_1:]
+                        graph1.samples[edge2] = graph1.samples[old_edge][0:split_index_1+1]
+                    for sam in graph1.samples[edge1]:
+                        #graph1.sampleHash[sam].remove(old_edge)
+                        graph1.sampleHash[sam]= [edge1]
+                    for sam in graph1.samples[edge2]:
+                        #if old_edge in graph1.sampleHash[sam]:
+                        #    graph1.sampleHash[sam].remove(old_edge)
+                        graph1.sampleHash[sam] = [edge2]
+                    g2_in_matched_to[intersection] = new_node
+                    g1_in_matched_to[new_node] = intersection
+                #else:
+                #    print(len(closest_samples))
+
+        for intersection in g2_in_matched_to.keys():                
+            if g2_in_matched_to[intersection] != 0:   # An intersection from g2 is matched to an intersection from g1
+                #if graph1.degree[graph1.nodehash[i]] < graph2.degree[graph2.nodehash[g1_in_matched_to[i]]]: # The vertex is missing edges so let's add them
+                    # identify the edges that are not matched (the number might be more than the difference of vertex degrees)
+                #v = vector(g2_in_matched_to[i],i)
+                #for edge in graph2.edgeLink[graph2.nodehash[i]]:
+                #    if g2_matched_perc[edge] < 0.1:
+                stitch(graph1,graph2,g2_matched_to,g1_matched_to,g1_in_matched_to,g2_in_matched_to,g2_matched_perc,intersection)
+                
+        logging.info("Time for merging: " + str(time.time() - start_time))
+        print("Time for merging: " + str(time.time() - start_time))
+
+            
+
+
+
+
+
+
+
+
+        
+
 
 def merge_like_a_dream(graph1,graph2,matching_threshold,bearing_limit,filename,start_time):
     if os.path.exists(filename+"_matching.pickle"):
@@ -421,6 +771,8 @@ def merge_like_a_dream(graph1,graph2,matching_threshold,bearing_limit,filename,s
             #elif graph1.degree[graph1.nodehash[i]] == graph2.degree[graph2.nodehash[g1_in_matched_to[i]]]: # check to see if they have the same degree, their edges should all be matched with each other. (NO NEW EDGES)
 
         #else: # An intersection seems to be a road in the second map (possible degree-1 vertex) 
+        logging.info("Time for merging: " + str(time.time() - start_time))
+        print("Time for merging: " + str(time.time() - start_time))
 """
     for intersection in g1_in_matched_to.keys():
         if g1_in_matched_to[intersection] == 0 and graph1.nodeDegree[graph1.nodeHash[intersection]] == 1: # intersection on g1 not matched to g2 and is degree-1
@@ -1629,6 +1981,7 @@ if __name__ == '__main__':
                 pickle.dump(graph2, handle, protocol=pickle.HIGHEST_PROTOCOL)
     start_time = time.time()
     #weighted_max_matching(graph1,graph2,matching_threshold,bearing_limit,f_results,start_time)
-    merge_like_a_dream(graph1,graph2,matching_threshold,bearing_limit,f_results,start_time)
+    #merge_like_a_dream(graph1,graph2,matching_threshold,bearing_limit,f_results,start_time)
+    merge_faster(graph1,graph2,matching_threshold,bearing_limit,f_results,start_time)
     f_newmap = "{folder}/{dataset}_{map}".format(folder=f_data,dataset=dataset,map=map1+"_"+map2)
     graph1.Dump2txt(f_newmap)
