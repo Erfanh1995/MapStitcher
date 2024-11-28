@@ -15,3 +15,7 @@ python3 Merger.py <data_folder> <dataset_name> <map1> <map2>
 
 `<map2>` is the name of the map in `<data_folder>/<dataset_name>/map2` directory
 
+
+# Publication
+
+Erfan Hosseini Sereshgi and Carola Wenk, Map Stitcher: Graph Sampling-based Map Conflation, The 3rd ACM SIGSPATIAL International Workshop on Spatial Big Data and AI for Industrial Applications (GeoIndustry '24), Pages 5-15, 2024, doi: https://dl.acm.org/doi/10.1145/3681766.3699604
